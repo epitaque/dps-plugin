@@ -1,23 +1,19 @@
 ﻿using Dalamud.Data;
-using Dalamud.Game.ClientState;
 using Dalamud.Game.ClientState.Objects;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.ClientState.Party;
 using Dalamud.Game.Command;
 using Dalamud.Game.Gui;
-using Dalamud.Game.Gui.PartyFinder;
-using Dalamud.Game.Gui.PartyFinder.Types;
 using Dalamud.Game.Network;
 using Dalamud.IoC;
 using Dalamud.Plugin;
+using Dalamud.Utility;
 using Lumina.Excel.GeneratedSheets;
 using Machina.FFXIV.Headers;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Runtime.InteropServices;
-using static Dalamud.Game.Gui.PartyFinder.PartyFinderGui;
+using System.Text.RegularExpressions;
 
 namespace DpsPlugin
 {
@@ -176,11 +172,6 @@ namespace DpsPlugin
 
                 File.AppendAllText(logPath, $"ability1 length {header.MessageLength}, actorId: {header.ActorID}, type {header.MessageType} effectHeader. actionId {effectHeader.actionId}, action name: {action.Name}, playerCharacter name: {playerCharacter.Name}, playerCharacter level: {playerCharacter.Level}, inParty: {inParty} potency: {actionTransient.Description.ToString()}\n");
             }
-        }
-
-        public static int FindPotency(string description, int level) {
-            // Somehow parse potency out of an ability description. This is going to be a billion ugly switches
-            return -1;
         }
 
         public static void AppendAllBytes(string path, byte[] bytes)

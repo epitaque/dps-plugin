@@ -5,7 +5,7 @@ VisualStudioVersion = 16.0.29709.97
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DpsPlugin", "DpsPlugin\DpsPlugin.csproj", "{13C812E9-0D42-4B95-8646-40EEBF30636F}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DpsPluginTest", "DpsPluginTest\DpsPluginTest.csproj", "{925C23D5-1BCA-4A9B-944C-E08E931F7635}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DpsPlugin.Test", "DpsPlugin.Test\DpsPlugin.Test.csproj", "{925C23D5-1BCA-4A9B-944C-E08E931F7635}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

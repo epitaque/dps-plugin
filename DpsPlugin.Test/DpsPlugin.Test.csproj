@@ -26,4 +26,22 @@
   <ItemGroup>
     <ProjectReference Include="..\DpsPlugin\DpsPlugin.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Dalamud">
+      <HintPath>..\..\..\AppData\Roaming\XIVLauncher\addon\Hooks\dev\Dalamud.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Lumina">
+      <HintPath>..\..\..\AppData\Roaming\XIVLauncher\addon\Hooks\dev\Lumina.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+    <ItemGroup>
+    <Reference Include="Lumina">
+      <HintPath>..\..\..\AppData\Roaming\XIVLauncher\addon\Hooks\dev\Lumina.Excel.dll</HintPath>
+    </Reference>
+  </ItemGroup>
 </Project>
