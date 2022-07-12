@@ -1,0 +1,12 @@
+{
+  "Author": "Epitaque",
+  "Name": "DPS Plugin",
+  "Punchline": "A plugin that displays the party's DPS.",
+  "Description": "A plugin that displays the party's DPS. Show UI with /dps.",
+  "InternalName": "DpsPlugin",
+  "ApplicableVersion": "any",
+  "Tags": [
+    "plugin",
+    "dps"
+  ]
+}
