@@ -47,7 +47,7 @@ namespace DpsPlugin {
         }
 
         // thanks https://github.com/xivapi/SaintCoinach/blob/36e9d613f4bcc45b173959eed3f7b5549fd6f540/SaintCoinach/Text/Parameters/PlayerParameters.cs
-        enum PlayerParameters {
+        enum PlayerParameter {
             ActiveClassJobIndex = 68,
             LevelIndex1 = 69,     // TODO: I have no idea what the difference between these is.
             LevelIndex2 = 72,     // 72 possibly JOB and 69 CLASS ?
@@ -61,48 +61,47 @@ namespace DpsPlugin {
             public int ActiveClassJobIndex;
         }
 
-        public static int FindPotency(Lumina.Excel.ExcelSheet<Action> actionSheet, Lumina.Excel.ExcelSheet<ActionTransient> actionTransientSheet, int actionId, int level) {
+        public class Potency {
+            public int NormalPotency = -1;
+            public int ComboPotency = -1;
+            public int DotPotency = -1;
+        }
+
+        public static Potency FindPotency(Lumina.Excel.ExcelSheet<Action> actionSheet, Lumina.Excel.ExcelSheet<ActionTransient> actionTransientSheet, uint actionId, int level) {
             ActionTransient actionTransient = actionTransientSheet.Where(a => a.RowId == actionId).FirstOrDefault()!;
             Action action = actionSheet.Where(a => a.RowId == actionId).FirstOrDefault()!;
             SeString seString = SeStringExtensions.ToDalamudString(actionTransient.Description);
             ParseContext ctx = new ParseContext();
             ctx.Level = level;
-            ctx.ActiveClassJobIndex = action.ClassJob.Value!.JobIndex;
+            ctx.ActiveClassJobIndex = (int)action.ClassJob.Value!.RowId;
+            Log!($"ctx.ActiveClassJobIndex {ctx.ActiveClassJobIndex}");
             StringBuilder descriptionBuilder = new StringBuilder();
-                
+
+            Potency potency = new Potency();
+
             foreach (Payload payload in seString.Payloads) {
                 if (payload.Type == PayloadType.RawText) {
                     descriptionBuilder.Append(((Dalamud.Game.Text.SeStringHandling.Payloads.TextPayload)payload).Text);
                 } else if (payload.Type == PayloadType.Unknown) {
                     byte[] payloadBytes = ((Dalamud.Game.Text.SeStringHandling.Payloads.RawPayload)payload).Data;
                     uint pos = 0;
-                    ReduceExpressionsToString(payloadBytes, descriptionBuilder, ref pos, ctx);
+                    string result = ParseRawPayload(payloadBytes, ref pos, ctx).ToString()!;
+                    descriptionBuilder.Append(result);
                 } else {
                     // Unknown payload type. we don't care.
                     // $"[Payload {payload.Type.ToString()}]";
                 }
             };
-            int num = -1;
+            string str = descriptionBuilder.ToString();
             if (Log != null) {
                 Log($"Description: {descriptionBuilder}");
             }
-            // int num = int.Parse(Regex.Match(description, @"\d+").ToString());
+            if (str.ToLower().Contains("combo")) {
+                potency.ComboPotency = int.Parse(Regex.Matches(str, @"combo potency.*?(\d+)").FirstOrDefault()!.Groups[1].ToString());
+            }
+            potency.NormalPotency = int.Parse(Regex.Matches(str, @"potency.*?(\d+)").FirstOrDefault()!.Groups[1].ToString());
 
-            return num;
-        }
-
-        public static string ReduceExpressionsToString(byte[] data, StringBuilder builder, ref uint pos, ParseContext ctx) {
-            byte startByte = data[pos++];
-            ParseAssertEqual(startByte, 0x02);
-            byte tagType = data[pos++];
-            uint length = GetInteger(data, ref pos);
-            uint clone = pos;
-            ParseTag(tagType, length, data, builder, ref clone, ctx);
-
-            pos += length;
-            byte endByte = data[pos++];
-            ParseAssertEqual(endByte, 0x03);
-            return "";
+            return potency;
         }
 
         public static System.Object ParseRawPayload(byte[] data, ref uint pos, ParseContext ctx) {
@@ -111,12 +110,12 @@ namespace DpsPlugin {
             byte tagType = data[pos++];
             uint length = GetInteger(data, ref pos);
             uint clone = pos;
-            ParseTag(tagType, length, data, ref clone, ctx);
+            System.Object result = ParseTag(tagType, length, data, ref clone, ctx);
 
             pos += length;
             byte endByte = data[pos++];
             ParseAssertEqual(endByte, 0x03);
-            return "";
+            return result;
         }
 
         
@@ -142,12 +141,13 @@ namespace DpsPlugin {
 
         }
 
-        public static void ParseTag(byte tagType, uint length, byte[] data, ref uint pos, ParseContext ctx)
+        public static System.Object ParseTag(byte tagType, uint length, byte[] data, ref uint pos, ParseContext ctx)
         {
             if (tagType == ((byte)Tags.IfTag))
             {
-                ParseIfTag(tagType, length, data, ref pos, ctx);
+                return ParseIfTag(tagType, length, data, ref pos, ctx);
             }
+            return null!;
         }
 
         public static System.Object ParseIfTag(byte tagType, uint length, byte[] data, ref uint pos, ParseContext ctx)
@@ -164,18 +164,18 @@ namespace DpsPlugin {
         // Thanks https://github.com/xivapi/SaintCoinach/blob/e0cb0856b10bb75af2b4f5073fcd5453c698d3af/SaintCoinach/Text/XivStringDecoder.cs
         public static System.Object EvaluateExpression(byte[] data, ref uint pos, ParseContext ctx) {
             byte expressionType = data[pos++];
-            // if (Log != null) {
-            //     Log($"Parse pos {pos} expression {((Expression)expressionType).ToString()} ({string.Format("{0:X2}", expressionType)}) bytes: ");
-            //     for(int i = 0; i < data.Length; i++) {
-            //         Log(string.Format("{0:X2} ", data[i]));
-            //     }
-            //     Log("\n");
+            if (Log != null) {
+                Log($"EvaluateExpression pos {pos} expression type {((Expression)expressionType).ToString()} ({string.Format("{0:X2}", expressionType)}) bytes: ");
+                for(int i = 0; i < data.Length; i++) {
+                    Log(string.Format("{0:X2} ", data[i]));
+                }
+                Log("\n");
 
-            //     // if (Log != null) {
-            //     //     Log($"Expression type: {((Expression)expressionType).ToString()}\n");
-            //     // }
+                // if (Log != null) {
+                //     Log($"Expression type: {((Expression)expressionType).ToString()}\n");
+                // }
 
-            // }
+            }
 
             if (expressionType < 0xD0) {
                 byte val = (byte)((int)expressionType - 1);
@@ -215,42 +215,58 @@ namespace DpsPlugin {
 
                 //         return new Nodes.StaticInteger(v);
                 //     }
-                // case Expression.Int32:
-                //     return new Nodes.StaticInteger(GetInteger(input, IntegerType.Int32));
-                // case Expression.GreaterThanOrEqualTo:
+                case Expression.Int32: {
+                    return GetInteger(data, ref pos);
+                }
+                case Expression.GreaterThanOrEqualTo: {
+                    int left = (int)EvaluateExpression(data, ref pos, ctx);
+                    int right = (int)EvaluateExpression(data, ref pos, ctx);
+                    return left >= right;
+                }
+
                 // case Expression.GreaterThan:
                 // case Expression.LessThanOrEqualTo:
                 // case Expression.LessThan:
                 // case Expression.NotEqual:
                 case Expression.Equal: {
-                    builder.Append("Equal(");
-                    /*var left =*/ EvaluateExpression(data, builder, ref pos, ctx);
-                    builder.Append(",");
-                    /*var right =*/ EvaluateExpression(data, builder, ref pos, ctx);
-                    builder.Append(")");
-                    // return new Nodes.Comparison(exprType, left, right);
-                    break;
+                    System.Object left = EvaluateExpression(data, ref pos, ctx);
+                    System.Object right = EvaluateExpression(data, ref pos, ctx);
+                    return left.Equals(right);
                 }
                 // case Expression.IntegerParameter:
-                case Expression.PlayerParameter:
-                    byte param = data[pos++];
-                    builder.Append($"PlayerParameter({param-1})");
-                    break;
+                case Expression.PlayerParameter: {
+                    int param = (int)data[pos++] - 1;
+                    Log!($"PlayerParameter param {param}\n");
+                    switch ((PlayerParameter)param) {
+                        case PlayerParameter.ActiveClassJobIndex: {
+                            Log($"PlayerParameter param {param} returning {ctx.ActiveClassJobIndex}\n");
+                            return ctx.ActiveClassJobIndex;
+                        }
+                        case PlayerParameter.LevelIndex1: case PlayerParameter.LevelIndex2: {
+                            Log($"PlayerParameter param {param} returning {ctx.Level}\n");
+                            return ctx.Level;
+                        }
+                        default: {
+                            return null!;
+                        }
+                    }
+                }
                 // case Expression.StringParameter:
                 // case Expression.ObjectParameter:
                 //     return new Nodes.Parameter(exprType, DecodeExpression(input));
                 // default:
                 //     throw new System.NotSupportedException();
             }
+            return null!;
         }
 
-        public static void ParseConditionalOutput(byte[] data, uint lastTagBytePos, StringBuilder builder, ref uint pos, ParseContext ctx) {
-            int exprs = 0;
-            while (pos < lastTagBytePos) {
-                EvaluateExpression(data, builder, ref pos, ctx);
-                builder.Append(",");
-            }
-            EvaluateExpression(data, builder, ref pos, ctx);
+        // public static void ParseConditionalOutput(byte[] data, uint lastTagBytePos, StringBuilder builder, ref uint pos, ParseContext ctx) {
+        //     int exprs = 0;
+        //     while (pos < lastTagBytePos) {
+        //         EvaluateExpression(data, builder, ref pos, ctx);
+        //         builder.Append(",");
+        //     }
+        //     EvaluateExpression(data, builder, ref pos, ctx);
 
             // Only one instance with more than two expressions (LogMessage.en[1115][4])
             // TODO: Not sure how it should be handled, discarding all but first and second for now.
@@ -264,7 +280,7 @@ namespace DpsPlugin {
             // else
             //     falseValue = null;
 
-        }
+        // }
 
         public static void ParseAssertEqual(byte a, byte b)
         {

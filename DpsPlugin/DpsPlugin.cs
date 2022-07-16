@@ -10,6 +10,8 @@ using Dalamud.Plugin;
 using Dalamud.Utility;
 using Lumina.Excel.GeneratedSheets;
 using Machina.FFXIV.Headers;
+using Newtonsoft.Json;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -36,6 +38,13 @@ namespace DpsPlugin
         private Lumina.Excel.ExcelSheet<ActionTransient> ActionTransientSheet { get; init; }
         private ObjectTable ObjectTable { get; init; } = null!;
         private PartyList PartyList { get; init; }
+        Dictionary<uint, List<AbilityCast>> AbilitiesCast;
+
+        struct AbilityCast {
+            uint actionId;
+            uint actor;
+            uint target;
+        };
 
         public DpsPlugin(
             [RequiredVersion("1.0")] DalamudPluginInterface pluginInterface,
@@ -151,9 +160,20 @@ namespace DpsPlugin
             }
         }
 
+        public static int DpsMessageSize {
+            get {
+                unsafe {
+                    return 0x20 + sizeof(Server_MessageHeader) + sizeof(Server_ActionEffectHeader);
+                }
+            }
+        }
+
+
         private unsafe void LogPacketInfo(System.IntPtr dataPtr, uint targetActorId) {
             dataPtr -= 0x20;
             Server_MessageHeader header = Marshal.PtrToStructure<Server_MessageHeader>(dataPtr);
+            // File.AppendAllText(logPath, $"actor {targetActorId} message type {header.MessageType}\n");
+
             if (header.MessageType == Opcodes.Ability1) {
                 Server_ActionEffectHeader effectHeader = Marshal.PtrToStructure<Server_ActionEffectHeader>(dataPtr);
 
@@ -170,8 +190,17 @@ namespace DpsPlugin
 
                 bool inParty = this.PartyList.Any(pm => pm.ObjectId == targetActorId);
 
-                File.AppendAllText(logPath, $"ability1 length {header.MessageLength}, actorId: {header.ActorID}, type {header.MessageType} effectHeader. actionId {effectHeader.actionId}, action name: {action.Name}, playerCharacter name: {playerCharacter.Name}, playerCharacter level: {playerCharacter.Level}, inParty: {inParty} potency: {actionTransient.Description.ToString()}\n");
+                File.AppendAllText(logPath, $"ability1 length {header.MessageLength}, actorId: {header.ActorID}, type {header.MessageType} effectHeader. actionId {effectHeader.actionId}, action name: {action.Name}, playerCharacter name: {playerCharacter!.Name}, playerCharacter level: {playerCharacter.Level}, inParty: {inParty} effectheader object dump: {JsonConvert.SerializeObject(effectHeader, Formatting.Indented)}\n");
+                System.Span<byte> span = new System.Span<byte>(((void*)dataPtr), 0x20 + sizeof(Server_MessageHeader) + sizeof(Server_ActionEffectHeader));
+                AppendAllBytes(binaryLogPath, span.ToArray());
             }
+
+            if (header.MessageType == Opcodes.ActorGauge) {
+                Server_ActorGauge gaugeHeader = Marshal.PtrToStructure<Server_ActorGauge>(dataPtr);
+                File.AppendAllText(logPath, $"actor {targetActorId} gauge {JsonConvert.SerializeObject(gaugeHeader, Formatting.Indented)}\n");
+
+            }
+            File.AppendAllText(logPath, $"o {header.MessageType} ");
         }
 
         public static void AppendAllBytes(string path, byte[] bytes)
